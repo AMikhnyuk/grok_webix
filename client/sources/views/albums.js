@@ -2,6 +2,7 @@ import {JetView} from "webix-jet";
 
 import albumsCollection from "../models/albumsCollection";
 import collectionA from "../models/collectionA";
+import songsCollection from "../models/songsCollection";
 
 export default class AlbumsView extends JetView {
 	config() {
@@ -23,16 +24,22 @@ export default class AlbumsView extends JetView {
 			select: true,
 			columns: [
 				{
-					id: "name", header: "Album", fillspace: true
+					id: "name", header: "Album", fillspace: 5
 				},
 				{
-					id: "date", header: "Release"
+					id: "date", header: "Release", fillspace: 2
 				},
 				{
-					id: "songsnum", header: "Songs"
+					id: "songsnum", header: "Songs", fillspace: 2
 				},
 				{
-					id: "copiesnum", header: "Copies"
+					id: "copiesnum",
+					header: "Copies",
+					template({copiesnum}) {
+						return `> 
+						${copiesnum > 999999 ? `${/\d/.exec(copiesnum)}M` : copiesnum} `;
+					},
+					fillspace: 2
 				},
 				{
 					id: "remove", header: ""
@@ -110,22 +117,25 @@ export default class AlbumsView extends JetView {
 	init() {
 		const list = this.$$("albums:list");
 		const table = this.$$("albums:table");
-		list.sync(collectionA);
-		table.sync(albumsCollection);
+		const templateTable = this.$$("template:table");
+		webix.promise.all([
+			collectionA.waitdata,
+			albumsCollection.waitdata,
+			songsCollection.waitdata
+		]).then(() => {
+			list.sync(collectionA);
+			table.sync(albumsCollection);
+			templateTable.sync(songsCollection);
+		});
 	}
 
 	parseTemplate(item) {
-		const data = albumsCollection.getItem(item.row);
+		const data = albumsCollection.getItem(item.id);
 		const template = this.$$("albums:template");
 		const info = this.$$("template:info");
-		const table = this.$$("template:table");
-		data.group = collectionA.getItem(data.groupId).name;
+		const templateTable = this.$$("template:table");
 		template.show();
-		if (data)info.parse(data);
-		if (data.songs) {
-			table.clearAll();
-			table.parse(data.songs);
-		}
-		else table.clearAll();
+		info.parse({...data, group: collectionA.getItem(data.groupId).name});
+		templateTable.filter("#albumId#", item.id);
 	}
 }
